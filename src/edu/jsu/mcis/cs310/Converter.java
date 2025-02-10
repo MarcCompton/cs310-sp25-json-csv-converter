@@ -2,6 +2,8 @@ package edu.jsu.mcis.cs310;
 
 import com.github.cliftonlabs.json_simple.*;
 import com.opencsv.*;
+import java.util.*;
+import java.io.*;
 
 public class Converter {
     
@@ -70,41 +72,121 @@ public class Converter {
         Exchange" lecture notes for more details, including examples.
         
     */
-    
-    @SuppressWarnings("unchecked")
+   
+     @SuppressWarnings("unchecked")
     public static String csvToJson(String csvString) {
-        
         String result = "{}"; // default return value; replace later!
         
         try {
-        
-            // INSERT YOUR CODE HERE
+            // Csv Parser
+            CSVReader reader = new CSVReader(new StringReader(csvString));
             
+            // Read the Csv data
+            List<String[]> full = reader.readAll();
+            
+            // Extract column headings
+            String[] ColHeadings = full.get(0);
+            
+            // Initialize Json structures
+            JsonObject CompleteJson = new JsonObject();
+            JsonArray ProdNums = new JsonArray();
+            JsonArray Data = new JsonArray();
+
+            // Process each row (skips the header row)
+            for (int i = 1; i < full.size(); i++) {
+                String[] row = full.get(i);
+                
+                // Add ProdNum to array
+                ProdNums.add(row[0]);
+                
+                // Create a Json array for row data
+                JsonArray rowData = new JsonArray();
+                
+                for (int x = 1; x < row.length; x++) {
+                String currentColumn = ColHeadings[x];
+                String cellValue = row[x];
+
+                // Check for "Season" or "Episode" columns
+                if ("Season".equals(currentColumn) || "Episode".equals(currentColumn)) {
+                    rowData.add(Integer.parseInt(cellValue)); // Convert to integer
+                } else {
+                    rowData.add(cellValue); // Add as is
+                }
+            }
+                // Add the row data to array
+                Data.add(rowData);
+            }
+            // Add the Json structures to the complete Json
+            CompleteJson.put("ProdNums", ProdNums);
+            CompleteJson.put("ColHeadings", ColHeadings);
+            CompleteJson.put("Data", Data);
+            
+            // Convert the Json object to a string
+            result = Jsoner.serialize(CompleteJson);
         }
         catch (Exception e) {
             e.printStackTrace();
         }
-        
+
         return result.trim();
         
     }
-    
+
     @SuppressWarnings("unchecked")
     public static String jsonToCsv(String jsonString) {
-        
         String result = ""; // default return value; replace later!
         
         try {
-            
-            // INSERT YOUR CODE HERE
-            
+        // Parse Json string into JsonObject
+        JsonObject CompleteJson = Jsoner.deserialize(jsonString, new JsonObject());
+        // Extract arrays
+        JsonArray ColHeadings = (JsonArray) CompleteJson.get("ColHeadings");
+        JsonArray ProdNums = (JsonArray) CompleteJson.get("ProdNums");
+        JsonArray Data = (JsonArray) CompleteJson.get("Data");
+        // Create a Csv writer
+        StringWriter writer = new StringWriter();
+        CSVWriter csvWriter = new CSVWriter(writer);
+        // Write the header row
+        String[] headerRow = new String[ColHeadings.size()];
+        for (int i = 0; i < ColHeadings.size(); i++) {
+            headerRow[i] = ColHeadings.getString(i);
         }
-        catch (Exception e) {
-            e.printStackTrace();
+
+        csvWriter.writeNext(headerRow);
+        // Iterate through each row in Data
+        for (int i = 0; i < Data.size(); i++) {
+            JsonArray rowData = (JsonArray) Data.get(i);
+            String[] row = new String[ColHeadings.size()];
+
+            // Assign the Product Number
+            row[0] = ProdNums.getString(i);
+
+            // Populate the rest of the row
+            int colIndex = 1;
+            for (Object value : rowData) {
+                String colName = ColHeadings.get(colIndex).toString();
+                String cellValue = value.toString();
+
+                // Format "Episode" with two digits, otherwise store as-is
+                row[colIndex] = colName.equals("Episode") 
+                                ? String.format("%02d", Integer.parseInt(cellValue)) 
+                                : cellValue;
+                
+                // Move to the next column
+                colIndex++; 
+            }
+
+            // Write the row to the Csv
+            csvWriter.writeNext(row);
         }
         
-        return result.trim();
         
+        // Get the Csv string
+        result = writer.toString();
     }
-    
+    catch (Exception e) {
+        e.printStackTrace();
+    }
+    return result.trim();
+    }
 }
